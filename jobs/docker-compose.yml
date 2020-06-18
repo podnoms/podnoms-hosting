@@ -1,0 +1,82 @@
+version: "3"
+services:
+  jobs-reverse-proxy:
+    image: "traefik:v2.2.1"
+    container_name: traefik
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/opt/letsencrypt/:/letsencrypt/"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    command:
+      - "--log.level=INFO"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--ping.entryPoint=web"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.tlschallenge=true"
+      # - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.storage=/letsencrypt/acme.json"
+    labels:
+      - "traefik.http.middlewares.test-redirectscheme.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.test-redirectscheme.redirectscheme.permanent=true"
+
+  jobs:
+    image: podnoms.azurecr.io/podnoms.jobs
+    container_name: ${JOBS_CONTAINER_NAME:-podnoms-jobs}
+    restart: always
+    environment:
+      ASPNETCORE_KeyVaultSettings__Vault: ${KeyVaultSettings__Vault}
+      ASPNETCORE_KeyVaultSettings__ClientId: ${KeyVaultSettings__ClientId}
+      ASPNETCORE_KeyVaultSettings__ClientSecret: ${KeyVaultSettings__ClientSecret}
+      VIRTUAL_HOST: ${JOBS_DOMAINS}
+      LETSENCRYPT_HOST: ${JOBS_DOMAINS}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jobs.rule=Host(`jobs.podnoms.com`)"
+      - "traefik.http.routers.jobs.entrypoints=websecure"
+      - "traefik.http.routers.jobs.tls.certresolver=podnoms-cert-resolver"
+
+  scraper:
+    image: podnoms.azurecr.io/podnoms.scraper
+    container_name: ${SCRAPER_CONTAINER_NAME:-podnoms-scraper}
+    restart: always
+    environment:
+      FACEBOOK_ID: ${FACEBOOK_ID}
+      FACEBOOK_SECRET: ${FACEBOOK_SECRET}
+      MONGODB_URI: ${MONGODB_URI}
+      SESSION_SECRET: ${SESSION_SECRET}
+      NODE_ENV: ${NODE_ENV}
+      MONGODB_URI: ${MONGODB_URI}
+      NODE_ENV: production
+      VIRTUAL_PORT: 3000
+      VIRTUAL_HOST: ${SCRAPER_DOMAINS}
+      LETSENCRYPT_HOST: ${SCRAPER_DOMAINS}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`scrpy.podnoms.com`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=podnoms-cert-resolver"      
+      
+  mongo:
+    image: mongo
+    container_name: podnoms-mongo
+    restart: always
+    volumes:
+      - ./data/dev/mongo:/data/db
+    ports:
+      - "27017:27017"
+
+networks:
+  default:
+    external:
+      name: ${NETWORK:-webproxy}

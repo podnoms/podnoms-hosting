@@ -16,9 +16,9 @@ services:
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.insecure=true"
-      - "--ping.entryPoint=web"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--ping.entryPoint=websecure"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.tlschallenge=true"
       # - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -36,9 +36,6 @@ services:
       ASPNETCORE_KeyVaultSettings__Vault: ${KeyVaultSettings__Vault}
       ASPNETCORE_KeyVaultSettings__ClientId: ${KeyVaultSettings__ClientId}
       ASPNETCORE_KeyVaultSettings__ClientSecret: ${KeyVaultSettings__ClientSecret}
-      VIRTUAL_HOST: ${JOBS_DOMAINS}
-      LETSENCRYPT_HOST: ${JOBS_DOMAINS}
-      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.jobs.rule=Host(`jobs.podnoms.com`)"
@@ -49,6 +46,8 @@ services:
     image: podnoms.azurecr.io/podnoms.scraper
     container_name: ${SCRAPER_CONTAINER_NAME:-podnoms-scraper}
     restart: always
+    ports: 
+      - "3000:3000"
     environment:
       FACEBOOK_ID: ${FACEBOOK_ID}
       FACEBOOK_SECRET: ${FACEBOOK_SECRET}
@@ -57,15 +56,11 @@ services:
       NODE_ENV: ${NODE_ENV}
       MONGODB_URI: ${MONGODB_URI}
       NODE_ENV: production
-      VIRTUAL_PORT: 3000
-      VIRTUAL_HOST: ${SCRAPER_DOMAINS}
-      LETSENCRYPT_HOST: ${SCRAPER_DOMAINS}
-      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`scrpy.podnoms.com`)"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=podnoms-cert-resolver"      
+      - "traefik.http.routers.scraper.rule=Host(`scrpy.podnoms.com`)"
+      - "traefik.http.routers.scraper.entrypoints=websecure"
+      - "traefik.http.routers.scraper.tls.certresolver=podnoms-cert-resolver"      
       
   mongo:
     image: mongo

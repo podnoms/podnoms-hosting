@@ -74,7 +74,7 @@ services:
     restart: always
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pages.rule=Host(`pages.podnoms.com`,`sweatoftheweek.com,`mixes.fergl.ie`,`muziq.fergl.ie`)"
+      - "traefik.http.routers.pages.rule=Host(`pages.podnoms.com`,`sweatoftheweek.com`,`muziq.fergl.ie`)"
       - "traefik.http.routers.pages.entrypoints=websecure"
       - "traefik.http.routers.pages.tls.certresolver=podnoms-cert-resolver"
 

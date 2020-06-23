@@ -12,6 +12,9 @@ services:
     volumes:
       - "/opt/letsencrypt/:/letsencrypt/"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    environment:
+      - JOKER_USERNAME=${JOKER_USERNAME}
+      - JOKER_PASSWORD=${JOKER_PASSWORD}
     command:
       - "--log.level=INFO"
       - "--api=true"
@@ -20,9 +23,14 @@ services:
       - "--ping.entryPoint=web"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.tlschallenge=true"
+      # - "--certificatesresolvers.podnoms-cert-resolver.acme.dnsChallenge=true"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.dnsChallenge.provider=manual"
       # - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.storage=/letsencrypt/acme.json"
     labels:
@@ -54,7 +62,7 @@ services:
       ASPNETCORE_KeyVaultSettings__ClientSecret: ${KeyVaultSettings__ClientSecret}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.podnoms.com`,`rss.podnoms.com`,`rt.podnoms.com`,`pdnm.be`,`dl.pdnm.be`,`cdn-l.podnoms.com`,`i.pdnm.be`)"
+      - "traefik.http.routers.api.rule=Host(`api.podnoms.com`,`rss.podnoms.com`, `rt.podnoms.com`,`pdnm.be`,`dl.pdnm.be`,`cdn-l.podnoms.com`,`i.pdnm.be`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=podnoms-cert-resolver"
 
@@ -74,11 +82,12 @@ services:
     restart: always
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pages.rule=Host(`pages.podnoms.com`,`sweatoftheweek.com`,`muziq.fergl.ie`)"
+      - "traefik.http.routers.pages.rule=Host(`sweatoftheweek.com`, `mixes.fergl.ie`, `muziq.fergl.ie`, `pages.podnoms.com`)"
+      # - "traefik.http.routers.pages.rule=Host(`*.podnoms.com`)"
       - "traefik.http.routers.pages.entrypoints=websecure"
       - "traefik.http.routers.pages.tls.certresolver=podnoms-cert-resolver"
 
-  jobs-watchtower:
+  watchtower:
     image: containrrr/watchtower
     container_name: podnoms-watcher
     restart: always
@@ -93,7 +102,7 @@ services:
     container_name: podnoms-rabbit
     restart: always
     environment:
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '-rabbit log [{file,[{file,"/var/log/rabbitmq/error.log"},{level,error},{date,"$D0"},{size,10485760},{count,3}]},{console,[{enabled,false}]}]'
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '-rabbit log [{file,[{file,"/var/log/rabbitmq/error.log"},{level,error},{size,10485760},{count,3}]},{console,[{enabled,false}]}]'
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}

@@ -1,4 +1,4 @@
-version: "3"
+version: "3.5"
 
 services:
   web-reverse-proxy:
@@ -16,21 +16,23 @@ services:
       - JOKER_USERNAME=${JOKER_USERNAME}
       - JOKER_PASSWORD=${JOKER_PASSWORD}
     command:
-      - "--log.level=INFO"
+      - "--log.level=DEBUG"
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.insecure=true"
       - "--ping.entryPoint=web"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+
       - "--certificatesresolvers.podnoms-cert-resolver.acme.tlschallenge=true"
-      # - "--certificatesresolvers.podnoms-cert-resolver.acme.dnsChallenge=true"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.dnsChallenge.provider=manual"
-      # - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
-      - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.storage=/letsencrypt/acme.json"
     labels:
@@ -39,8 +41,6 @@ services:
       - "traefik.http.routers.api.service=api@internal"
       - "traefik.http.routers.api.middlewares=auth"
       - "traefik.http.middlewares.auth.basicauth.users=test:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/,test2:$$apr1$$d9hr9HBB$$4HxwgUir3HP4EsggP/QNo0"
-      - "traefik.http.middlewares.test-redirectscheme.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.test-redirectscheme.redirectscheme.permanent=true"
 
   api:
     image: "podnoms.azurecr.io/podnoms.api"
@@ -53,6 +53,7 @@ services:
     volumes:
       - /opt/podnoms/cache/images:/wwwroot/.pn-cache
       - /opt/podnoms/data:/data
+      - dotnet-monitor:/tmp
     environment:
       ASPNETCORE_URLS: http://*:80
       APPINSIGHTS_INSTRUMENTATIONKEY: ${ApplicationInsights__InstrumentationKey}
@@ -119,4 +120,23 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
-      - "6379:6379"
+      - 6379:6379
+
+  sidecar:
+    image: "mcr.microsoft.com/dotnet/nightly/monitor:5.0.0-preview.1"
+    container_name: sidecar
+    ports:
+      - 52323:52323
+      - 52325:52325
+    expose:
+      - 52323
+      - 52325
+    volumes:
+      - dotnet-monitor:/tmp
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.sidecar.rule=Host(`diagnostics.podnoms.com`)"
+    #   - "traefik.http.routers.sidecar.entrypoints=websecure"
+    #   - "traefik.http.routers.sidecar.tls.certresolver=podnoms-cert-resolver"
+volumes:
+  dotnet-monitor:

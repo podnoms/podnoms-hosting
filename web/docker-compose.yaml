@@ -16,7 +16,7 @@ services:
       - JOKER_USERNAME=${JOKER_USERNAME}
       - JOKER_PASSWORD=${JOKER_PASSWORD}
     command:
-      - "--log.level=DEBUG"
+      - "--log.level=INFO"
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.insecure=true"
@@ -36,6 +36,7 @@ services:
       - "--certificatesresolvers.podnoms-cert-resolver.acme.email=fergal.moran@gmail.com"
       - "--certificatesresolvers.podnoms-cert-resolver.acme.storage=/letsencrypt/acme.json"
     labels:
+      - "com.centurylinklabs.watchtower.enable=false"
       - "traefik.http.routers.dashboard.rule=Host(`traefik.podnoms.com`)"
       - "traefik.http.routers.api.rule=Host(`traefik.podnoms.com`)"
       - "traefik.http.routers.api.service=api@internal"
@@ -43,7 +44,7 @@ services:
       - "traefik.http.middlewares.auth.basicauth.users=test:$$apr1$$H6uskkkW$$IgXLP6ewTrSuBkTrqE8wj/,test2:$$apr1$$d9hr9HBB$$4HxwgUir3HP4EsggP/QNo0"
 
   api:
-    image: "podnoms.azurecr.io/podnoms.api"
+    image: "docker.pkg.github.com/podnoms/podnoms-backend/podnoms-api"
     container_name: podnoms-api
     restart: always
     links:
@@ -68,17 +69,17 @@ services:
       - "traefik.http.routers.api.tls.certresolver=podnoms-cert-resolver"
 
   web:
-    image: "podnoms.azurecr.io/podnoms.web"
+    image: "docker.pkg.github.com/podnoms/podnoms-web/podnoms-web"
     container_name: podnoms-web
     restart: always
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`www.podnoms.com`, `podnoms.com`)"
+      - "traefik.http.routers.web.rule=Host(`podnoms.com`, `www.podnoms.com`)"
       - "traefik.http.routers.web.entrypoints=websecure"
       - "traefik.http.routers.web.tls.certresolver=podnoms-cert-resolver"
 
   pages:
-    image: "podnoms.azurecr.io/podnoms.pages"
+    image: "docker.pkg.github.com/podnoms/podnoms-pages/podnoms-pages"
     container_name: podnoms-pages
     restart: always
     labels:
@@ -92,16 +93,21 @@ services:
     image: containrrr/watchtower
     container_name: podnoms-watcher
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - REPO_USER=${REPO_USER}
       - REPO_PASS=${REPO_PASS}
+    command: --interval 30
 
   rabbit:
     image: "rabbitmq:management"
     container_name: podnoms-rabbit
     restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     environment:
       RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '-rabbit log [{file,[{file,"/var/log/rabbitmq/error.log"},{level,error},{size,10485760},{count,3}]},{console,[{enabled,false}]}]'
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
@@ -117,6 +123,8 @@ services:
     image: "redis"
     restart: always
     container_name: podnoms-redis
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
@@ -125,6 +133,8 @@ services:
   sidecar:
     image: "mcr.microsoft.com/dotnet/nightly/monitor:5.0.0-preview.1"
     container_name: sidecar
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     ports:
       - 52323:52323
       - 52325:52325
@@ -138,5 +148,47 @@ services:
     #   - "traefik.http.routers.sidecar.rule=Host(`diagnostics.podnoms.com`)"
     #   - "traefik.http.routers.sidecar.entrypoints=websecure"
     #   - "traefik.http.routers.sidecar.tls.certresolver=podnoms-cert-resolver"
+    # blog stuff
+  blog_db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BLOG_WORDPRESS_ROOTPWD}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${BLOG_WORDPRESS_PWD}
+
+  blog_wordpress:
+    depends_on:
+      - blog_db
+    image: wordpress:latest
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: blog_db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${BLOG_WORDPRESS_PWD}
+      WORDPRESS_DB_NAME: wordpress
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "traefik.enable=true"
+      - "traefik.http.routers.blog.rule=Host(`blog.podnoms.com`)"
+      - "traefik.http.routers.blog.entrypoints=websecure"
+      - "traefik.http.routers.blog.tls.certresolver=podnoms-cert-resolver"
+
+  dss-redirect:
+    image: morbz/docker-web-redirect
+    environment:
+      REDIRECT_TARGET: https://pdnm.be/N3
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "traefik.enable=true"
+      - "traefik.http.routers.dss.rule=Host(`deepsouthsounds.com`, `www.deepsouthsounds.com`)"
+      - "traefik.http.routers.dss.entrypoints=websecure"
+      - "traefik.http.routers.dss.tls.certresolver=podnoms-cert-resolver"    
 volumes:
   dotnet-monitor:
+  db_data:

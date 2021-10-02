@@ -1,7 +1,7 @@
 version: "3"
 services:
   traefik:
-    image: "traefik:v2.2.1"
+    image: "traefik:v2.4.2"
     container_name: traefik
     restart: always
     ports:
@@ -49,7 +49,7 @@ services:
       - "traefik.http.routers.jobs.tls.certresolver=podnoms-cert-resolver"
 
   scraper:
-    image: docker.pkg.github.com/podnoms/podnoms-scraper/podnoms-scraper:trunk
+    image: docker.pkg.github.com/podnoms/podnoms-scraper/podnoms-scraper
     container_name: podnoms-scraper
     restart: always
     ports:
@@ -59,6 +59,8 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       CHROMIUM_BINARY: ${CHROMIUM_BINARY}
       MONGODB_URI: ${MONGODB_URI}
+      FACEBOOK_ID: ${FACEBOOK_ID}
+      FACEBOOK_SECRET: ${FACEBOOK_SECRET}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.scraper.rule=Host(`scraper.pdnm.be`)"
